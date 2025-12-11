@@ -63,7 +63,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       state = AuthState.authenticated(
         user: response.user,
-        token: response.token,
+        token: response.accessToken,
       );
     } catch (e) {
       state = AuthState.error(_getErrorMessage(e));
@@ -85,7 +85,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       state = AuthState.authenticated(
         user: response.user,
-        token: response.token,
+        token: response.accessToken,
       );
     } catch (e) {
       state = AuthState.error(_getErrorMessage(e));
@@ -101,7 +101,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       state = AuthState.authenticated(
         user: response.user,
-        token: response.token,
+        token: response.accessToken,
       );
     } catch (e) {
       state = AuthState.error(_getErrorMessage(e));

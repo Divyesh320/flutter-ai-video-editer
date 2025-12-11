@@ -83,7 +83,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
       // Create assistant message from response
       final assistantMessage = Message(
-        id: response.messageId,
+        id: response.jobId,
         conversationId: state.conversationId!,
         role: MessageRole.assistant,
         content: response.response,
