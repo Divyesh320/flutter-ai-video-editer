@@ -9,8 +9,6 @@ enum AuthProvider {
   email,
   @JsonValue('google')
   google,
-  @JsonValue('facebook')
-  facebook,
 }
 
 /// User model representing an authenticated user

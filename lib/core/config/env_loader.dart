@@ -110,8 +110,6 @@ class EnvLoader {
     _addIfNotEmpty(config, 'JWT_SECRET_KEY', const String.fromEnvironment('JWT_SECRET_KEY'));
     _addIfNotEmpty(config, 'GOOGLE_CLIENT_ID', const String.fromEnvironment('GOOGLE_CLIENT_ID'));
     _addIfNotEmpty(config, 'GOOGLE_CLIENT_SECRET', const String.fromEnvironment('GOOGLE_CLIENT_SECRET'));
-    _addIfNotEmpty(config, 'FACEBOOK_APP_ID', const String.fromEnvironment('FACEBOOK_APP_ID'));
-    _addIfNotEmpty(config, 'FACEBOOK_APP_SECRET', const String.fromEnvironment('FACEBOOK_APP_SECRET'));
     
     // AI Services
     _addIfNotEmpty(config, 'OPENAI_API_KEY', const String.fromEnvironment('OPENAI_API_KEY'));

@@ -45,7 +45,7 @@ This backend powers modern AI-driven mobile applications with:
 
 ### 🔐 **Enterprise Authentication System**
 - **JWT Authentication** - Secure token-based auth with refresh tokens
-- **OAuth Integration** - Google & Facebook social login
+- **OAuth Integration** - Google social login
 - **Session Management** - Multi-device session tracking and control
 - **Rate Limiting** - Advanced protection against abuse
 - **Quota Management** - Usage tracking and limits per user
@@ -118,11 +118,9 @@ JWT_SECRET_KEY=your-super-secret-jwt-key-change-in-production
 # 🤖 OpenAI API (Required)
 OPENAI_API_KEY=sk-your-openai-api-key
 
-# 🔐 OAuth (Optional - for social login)
+# 🔐 OAuth (Optional - for Google login)
 GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=your-google-client-secret
-FACEBOOK_APP_ID=your-facebook-app-id
-FACEBOOK_APP_SECRET=your-facebook-app-secret
 
 # ⚙️ App Configuration
 APP_NAME=Multimodal AI Assistant
@@ -197,7 +195,7 @@ curl http://localhost:3000/health
   _id: ObjectId,
   email: "user@example.com",
   name: "John Doe",
-  provider: "local|google|facebook",
+  provider: "local|google",
   quota: {
     limit: 100,
     used: 25,

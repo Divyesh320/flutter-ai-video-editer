@@ -34,7 +34,7 @@ class MockAuthService implements AuthService {
     );
     storedToken = 'test_token';
     storedUser = user;
-    return AuthResponse(user: user, token: 'test_token');
+    return AuthResponse(user: user, accessToken: 'test_token');
   }
 
   @override
@@ -48,7 +48,7 @@ class MockAuthService implements AuthService {
     );
     storedToken = 'test_token';
     storedUser = user;
-    return AuthResponse(user: user, token: 'test_token');
+    return AuthResponse(user: user, accessToken: 'test_token');
   }
 
   @override
@@ -57,18 +57,22 @@ class MockAuthService implements AuthService {
       id: 'user-123',
       email: 'oauth@example.com',
       name: 'OAuth User',
-      provider: provider == OAuthProvider.google
-          ? AuthProvider.google
-          : AuthProvider.facebook,
+      provider: AuthProvider.google,
       createdAt: DateTime.now(),
     );
     storedToken = 'oauth_token';
     storedUser = user;
-    return AuthResponse(user: user, token: 'oauth_token');
+    return AuthResponse(user: user, accessToken: 'oauth_token');
   }
 
   @override
   Future<void> logout() async {
+    storedToken = null;
+    storedUser = null;
+  }
+
+  @override
+  Future<void> logoutAll() async {
     storedToken = null;
     storedUser = null;
   }
@@ -90,6 +94,9 @@ class MockAuthService implements AuthService {
 
   @override
   Future<User?> getCurrentUser() async => storedUser;
+
+  @override
+  Future<List<Map<String, dynamic>>> getSessions() async => [];
 }
 
 void main() {
@@ -154,12 +161,7 @@ void main() {
       expect(authNotifier.state.user!.provider, equals(AuthProvider.google));
     });
 
-    test('OAuth login works for Facebook', () async {
-      await authNotifier.loginWithOAuth(OAuthProvider.facebook);
 
-      expect(authNotifier.state.isAuthenticated, isTrue);
-      expect(authNotifier.state.user!.provider, equals(AuthProvider.facebook));
-    });
 
     test('clearError resets error state', () async {
       mockAuthService.shouldFailLogin = true;

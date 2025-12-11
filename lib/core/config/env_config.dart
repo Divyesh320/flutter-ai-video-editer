@@ -104,7 +104,6 @@ class EnvConfig {
   // ===========================================
   
   String? get googleClientId => getStringOrNull('GOOGLE_CLIENT_ID');
-  String? get facebookAppId => getStringOrNull('FACEBOOK_APP_ID');
   
   // ===========================================
   // AI Services Configuration

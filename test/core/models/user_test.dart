@@ -50,7 +50,7 @@ void main() {
         final json = {
           'id': 'user-123',
           'email': 'test@example.com',
-          'provider': 'facebook',
+          'provider': 'google',
           'created_at': '2024-01-01T00:00:00.000Z',
         };
 

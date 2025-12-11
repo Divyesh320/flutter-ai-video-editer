@@ -63,7 +63,7 @@ class SignupRequest {
 }
 
 /// OAuth provider types
-enum OAuthProvider { google, facebook }
+enum OAuthProvider { google }
 
 /// Abstract interface for authentication operations
 abstract class AuthService {
@@ -73,7 +73,7 @@ abstract class AuthService {
   /// Register new user with email
   Future<AuthResponse> signup(SignupRequest request);
 
-  /// Login with OAuth provider (Google/Facebook)
+  /// Login with OAuth provider (Google)
   Future<AuthResponse> loginWithOAuth(OAuthProvider provider);
 
   /// Logout and clear credentials
@@ -197,12 +197,12 @@ class AuthServiceImpl implements AuthService {
   @override
   Future<AuthResponse> loginWithOAuth(OAuthProvider provider) async {
     // OAuth flow - get token from provider first, then send to backend
-    // This would typically use google_sign_in or flutter_facebook_auth packages
+    // This would typically use google_sign_in package
     
     // For now, throw unimplemented
     throw UnimplementedError(
       'OAuth login requires platform-specific implementation. '
-      'Use google_sign_in or flutter_facebook_auth packages.',
+      'Use google_sign_in package.',
     );
   }
 

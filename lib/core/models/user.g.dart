@@ -27,5 +27,4 @@ Map<String, dynamic> _$UserToJson(User instance) => <String, dynamic>{
 const _$AuthProviderEnumMap = {
   AuthProvider.email: 'email',
   AuthProvider.google: 'google',
-  AuthProvider.facebook: 'facebook',
 };

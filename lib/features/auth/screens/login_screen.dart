@@ -138,34 +138,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: 24),
                 // OAuth Buttons
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: authState.isLoading
-                            ? null
-                            : () => _handleOAuthLogin(OAuthProvider.google),
-                        icon: const Icon(Icons.g_mobiledata, size: 24),
-                        label: const Text('Google'),
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(48),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: authState.isLoading
-                            ? null
-                            : () => _handleOAuthLogin(OAuthProvider.facebook),
-                        icon: const Icon(Icons.facebook, size: 24),
-                        label: const Text('Facebook'),
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(48),
-                        ),
-                      ),
-                    ),
-                  ],
+                OutlinedButton.icon(
+                  onPressed: authState.isLoading
+                      ? null
+                      : () => _handleOAuthLogin(OAuthProvider.google),
+                  icon: const Icon(Icons.g_mobiledata, size: 24),
+                  label: const Text('Continue with Google'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(48),
+                  ),
                 ),
               ],
             ),

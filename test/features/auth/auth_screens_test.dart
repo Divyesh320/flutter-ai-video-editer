@@ -67,8 +67,7 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.text('Google'), findsOneWidget);
-      expect(find.text('Facebook'), findsOneWidget);
+      expect(find.text('Continue with Google'), findsOneWidget);
     });
 
     testWidgets('toggles password visibility', (tester) async {
@@ -125,8 +124,7 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.text('Google'), findsOneWidget);
-      expect(find.text('Facebook'), findsOneWidget);
+      expect(find.text('Continue with Google'), findsOneWidget);
     });
 
     testWidgets('shows password requirements helper text', (tester) async {
