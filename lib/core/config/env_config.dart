@@ -1,7 +1,7 @@
 /// Environment configuration for the Multimodal AI Assistant
+/// FREE APIs Only Version
 /// 
 /// This class provides type-safe access to environment variables.
-/// Values are loaded from .env file or system environment.
 library;
 
 /// Environment configuration singleton
@@ -11,16 +11,14 @@ class EnvConfig {
   static final EnvConfig _instance = EnvConfig._();
   static EnvConfig get instance => _instance;
   
-  // Internal storage for config values
   final Map<String, String> _config = {};
   
-  /// Initialize configuration from a map (typically from .env file)
+  /// Initialize configuration from a map
   void initialize(Map<String, String> config) {
     _config.clear();
     _config.addAll(config);
   }
   
-  /// Get a string value, throws if not found
   String getString(String key) {
     final value = _config[key];
     if (value == null || value.isEmpty) {
@@ -29,18 +27,15 @@ class EnvConfig {
     return value;
   }
   
-  /// Get a string value with default
   String getStringOrDefault(String key, String defaultValue) {
     return _config[key]?.isNotEmpty == true ? _config[key]! : defaultValue;
   }
   
-  /// Get an optional string value
   String? getStringOrNull(String key) {
     final value = _config[key];
     return value?.isNotEmpty == true ? value : null;
   }
   
-  /// Get an integer value, throws if not found or invalid
   int getInt(String key) {
     final value = getString(key);
     final parsed = int.tryParse(value);
@@ -50,14 +45,12 @@ class EnvConfig {
     return parsed;
   }
   
-  /// Get an integer value with default
   int getIntOrDefault(String key, int defaultValue) {
     final value = _config[key];
     if (value == null || value.isEmpty) return defaultValue;
     return int.tryParse(value) ?? defaultValue;
   }
   
-  /// Get a double value, throws if not found or invalid
   double getDouble(String key) {
     final value = getString(key);
     final parsed = double.tryParse(value);
@@ -67,20 +60,17 @@ class EnvConfig {
     return parsed;
   }
   
-  /// Get a double value with default
   double getDoubleOrDefault(String key, double defaultValue) {
     final value = _config[key];
     if (value == null || value.isEmpty) return defaultValue;
     return double.tryParse(value) ?? defaultValue;
   }
   
-  /// Get a boolean value
   bool getBool(String key) {
     final value = _config[key]?.toLowerCase();
     return value == 'true' || value == '1' || value == 'yes';
   }
   
-  /// Get a boolean value with default
   bool getBoolOrDefault(String key, bool defaultValue) {
     final value = _config[key];
     if (value == null || value.isEmpty) return defaultValue;
@@ -94,44 +84,25 @@ class EnvConfig {
   // Backend API Configuration
   // ===========================================
   
-  /// Base URL for backend API (e.g., http://10.0.2.2:3000/api for Android emulator)
   String get apiBaseUrl => getStringOrDefault('API_BASE_URL', 'http://10.0.2.2:3000/api');
   int get apiTimeoutSeconds => getIntOrDefault('API_TIMEOUT_SECONDS', 30);
   int get apiMaxRetries => getIntOrDefault('API_MAX_RETRIES', 3);
   
   // ===========================================
-  // OAuth Configuration (for social login)
+  // AI Services Configuration (Google Gemini FREE)
   // ===========================================
   
-  String? get googleClientId => getStringOrNull('GOOGLE_CLIENT_ID');
+  /// Chat model (Google Gemini FREE)
+  String get aiChatModel => getStringOrDefault('AI_CHAT_MODEL', 'gemini-1.5-flash');
   
-  // ===========================================
-  // AI Services Configuration
-  // ===========================================
-  
-  /// Default chat model
-  String get aiChatModel => getStringOrDefault('AI_CHAT_MODEL', 'gpt-4');
-  
-  /// Speech-to-Text model
-  String get sttModel => getStringOrDefault('STT_MODEL', 'whisper-1');
-  
-  /// Text-to-Speech settings
-  String get ttsVoice => getStringOrDefault('TTS_VOICE', 'alloy');
-  String get ttsModel => getStringOrDefault('TTS_MODEL', 'tts-1');
-  
-  /// Vision model
-  String get visionModel => getStringOrDefault('VISION_MODEL', 'gpt-4-vision-preview');
-  
-  /// Embedding model
-  String get embeddingModel => getStringOrDefault('EMBEDDING_MODEL', 'text-embedding-ada-002');
+  /// Vision model (Google Gemini FREE)
+  String get visionModel => getStringOrDefault('VISION_MODEL', 'gemini-1.5-flash');
   
   // ===========================================
   // File Upload Limits
   // ===========================================
   
   int get maxImageSizeMB => getIntOrDefault('MAX_IMAGE_SIZE_MB', 5);
-  int get maxAudioSizeMB => getIntOrDefault('MAX_AUDIO_SIZE_MB', 25);
-  int get maxAudioDurationMinutes => getIntOrDefault('MAX_AUDIO_DURATION_MINUTES', 10);
   int get maxVideoSizeMB => getIntOrDefault('MAX_VIDEO_SIZE_MB', 100);
   int get maxVideoDurationSeconds => getIntOrDefault('MAX_VIDEO_DURATION_SECONDS', 300);
   
@@ -151,13 +122,7 @@ class EnvConfig {
   String get appEnvironment => getStringOrDefault('APP_ENVIRONMENT', 'development');
   bool get debugMode => getBoolOrDefault('DEBUG_MODE', false);
   
-  String? get privacyPolicyUrl => getStringOrNull('PRIVACY_POLICY_URL');
-  String? get termsOfServiceUrl => getStringOrNull('TERMS_OF_SERVICE_URL');
-  
-  /// Check if running in production
   bool get isProduction => appEnvironment.toLowerCase() == 'production';
-  
-  /// Check if running in development
   bool get isDevelopment => appEnvironment.toLowerCase() == 'development';
 }
 
