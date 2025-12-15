@@ -7,12 +7,18 @@ class PermissionHelper {
 
   /// Request all required permissions for the app
   static Future<Map<Permission, PermissionStatus>> requestAllPermissions() async {
-    final permissions = [
+    final permissions = <Permission>[
       Permission.microphone,
       Permission.camera,
-      Permission.photos,
-      Permission.storage,
     ];
+    
+    // Add media permissions based on Android version
+    // Android 13+ uses granular media permissions
+    permissions.addAll([
+      Permission.photos,
+      Permission.videos,
+      Permission.audio,
+    ]);
 
     final statuses = await permissions.request();
     return statuses;
@@ -64,7 +70,7 @@ class PermissionHelper {
       'microphone': await Permission.microphone.isGranted,
       'camera': await Permission.camera.isGranted,
       'photos': await Permission.photos.isGranted || await Permission.photos.isLimited,
-      'storage': await Permission.storage.isGranted,
+      'videos': await Permission.videos.isGranted || await Permission.videos.isLimited,
     };
   }
 

@@ -84,67 +84,25 @@ class AuthWrapper extends ConsumerStatefulWidget {
 }
 
 class _AuthWrapperState extends ConsumerState<AuthWrapper> {
-  bool _permissionsChecked = false;
-  bool _showPermissionScreen = false;
-
   @override
   void initState() {
     super.initState();
-    _checkFirstLaunch();
+    _requestPermissionsOnFirstLaunch();
   }
 
-  Future<void> _checkFirstLaunch() async {
+  Future<void> _requestPermissionsOnFirstLaunch() async {
     final prefs = await SharedPreferences.getInstance();
     final hasRequestedPermissions = prefs.getBool('permissions_requested') ?? false;
     
     if (!hasRequestedPermissions) {
-      // First launch - show permission screen
-      setState(() {
-        _showPermissionScreen = true;
-        _permissionsChecked = true;
-      });
-    } else {
-      setState(() {
-        _permissionsChecked = true;
-      });
+      // First launch - request all permissions via popup
+      await PermissionHelper.requestAllPermissions();
+      await prefs.setBool('permissions_requested', true);
     }
-  }
-
-  Future<void> _onPermissionsGranted() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('permissions_requested', true);
-    setState(() {
-      _showPermissionScreen = false;
-    });
-  }
-
-  Future<void> _onSkipPermissions() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('permissions_requested', true);
-    setState(() {
-      _showPermissionScreen = false;
-    });
   }
 
   @override
   Widget build(BuildContext context) {
-    // Show loading while checking permissions
-    if (!_permissionsChecked) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
-
-    // Show permission request screen on first launch
-    if (_showPermissionScreen) {
-      return PermissionRequestScreen(
-        onPermissionsGranted: _onPermissionsGranted,
-        onSkip: _onSkipPermissions,
-      );
-    }
-
     final authState = ref.watch(authNotifierProvider);
 
     // Show loading while checking auth status
