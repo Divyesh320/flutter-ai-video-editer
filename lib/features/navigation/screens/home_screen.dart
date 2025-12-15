@@ -5,6 +5,9 @@ import 'package:intl/intl.dart';
 import '../../../core/models/models.dart';
 import '../../chat/providers/conversation_notifier.dart';
 import '../../chat/providers/conversation_state.dart';
+import '../../chat/screens/model_comparison_screen.dart';
+import '../../image_generation/screens/image_generation_screen.dart';
+import '../../video_editing/screens/video_editing_screen.dart';
 import '../widgets/quick_action_button.dart';
 import '../widgets/empty_state_widget.dart';
 import '../widgets/skeleton_loader.dart';
@@ -91,12 +94,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
           ),
           const SizedBox(height: 12),
+          // First row
           Row(
             children: [
               Expanded(
                 child: QuickActionButton(
                   icon: Icons.chat,
-                  label: 'New Chat',
+                  label: 'Chat',
                   color: theme.colorScheme.primary,
                   onTap: () => MainShell.navigateToNewChat(ref),
                 ),
@@ -104,28 +108,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: QuickActionButton(
-                  icon: Icons.mic,
-                  label: 'Voice',
-                  color: Colors.orange,
-                  onTap: () => _startVoiceChat(),
+                  icon: Icons.compare_arrows,
+                  label: 'Compare AI',
+                  color: Colors.teal,
+                  onTap: () => _openModelComparison(),
                 ),
               ),
-              const SizedBox(width: 12),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Second row
+          Row(
+            children: [
               Expanded(
                 child: QuickActionButton(
-                  icon: Icons.image,
-                  label: 'Image',
-                  color: Colors.green,
-                  onTap: () => _startImageChat(),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: QuickActionButton(
-                  icon: Icons.videocam,
-                  label: 'Video',
+                  icon: Icons.auto_awesome,
+                  label: 'Generate Image',
                   color: Colors.purple,
-                  onTap: () => _startVideoChat(),
+                  onTap: () => _openImageGeneration(),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: QuickActionButton(
+                  icon: Icons.movie_edit,
+                  label: 'Edit Video',
+                  color: Colors.orange,
+                  onTap: () => _openVideoEditing(),
                 ),
               ),
             ],
@@ -206,13 +215,114 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           color: theme.colorScheme.onSurfaceVariant,
         ),
       ),
-      trailing: Text(
-        _formatTimestamp(conversation.updatedAt),
-        style: theme.textTheme.bodySmall?.copyWith(
-          color: theme.colorScheme.outline,
-        ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            _formatTimestamp(conversation.updatedAt),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.outline,
+            ),
+          ),
+          PopupMenuButton<String>(
+            icon: Icon(Icons.more_vert, size: 20, color: theme.colorScheme.outline),
+            onSelected: (value) {
+              switch (value) {
+                case 'rename':
+                  _showRenameDialog(conversation);
+                  break;
+                case 'delete':
+                  _showDeleteDialog(conversation);
+                  break;
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'rename',
+                child: Row(
+                  children: [
+                    Icon(Icons.edit, size: 20),
+                    SizedBox(width: 8),
+                    Text('Rename'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'delete',
+                child: Row(
+                  children: [
+                    Icon(Icons.delete, size: 20, color: Colors.red),
+                    SizedBox(width: 8),
+                    Text('Delete', style: TextStyle(color: Colors.red)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
       onTap: () => MainShell.navigateToConversation(ref, conversation.id),
+    );
+  }
+
+  void _showRenameDialog(Conversation conversation) {
+    final controller = TextEditingController(text: conversation.title ?? '');
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Rename Chat'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            labelText: 'Chat Name',
+            border: OutlineInputBorder(),
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final newTitle = controller.text.trim();
+              if (newTitle.isNotEmpty) {
+                await ref.read(conversationNotifierProvider.notifier)
+                    .renameConversation(conversation.id, newTitle);
+              }
+              if (mounted) Navigator.pop(context);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteDialog(Conversation conversation) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Chat'),
+        content: Text('Are you sure you want to delete "${conversation.title ?? 'this chat'}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              await ref.read(conversationNotifierProvider.notifier)
+                  .deleteConversation(conversation.id);
+              if (mounted) Navigator.pop(context);
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
     );
   }
 
@@ -231,33 +341,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
   }
 
-  void _startVoiceChat() {
-    MainShell.navigateToNewChat(ref);
-    // Voice recording will be triggered from the chat screen
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Use the microphone button to start voice input'),
-        duration: Duration(seconds: 2),
+  void _openModelComparison() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const ModelComparisonScreen(),
       ),
     );
   }
 
-  void _startImageChat() {
-    MainShell.navigateToNewChat(ref);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Use the image button to upload an image'),
-        duration: Duration(seconds: 2),
+  void _openImageGeneration() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const ImageGenerationScreen(),
       ),
     );
   }
 
-  void _startVideoChat() {
-    MainShell.navigateToNewChat(ref);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Use the video button to upload a video'),
-        duration: Duration(seconds: 2),
+  void _openVideoEditing() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const VideoEditingScreen(),
       ),
     );
   }

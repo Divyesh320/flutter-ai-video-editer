@@ -108,8 +108,13 @@ class ApiService {
     return _secureStorage.read(key: _tokenKey);
   }
 
+  /// Current token (cached for sync access)
+  String? _currentToken;
+  String? get currentToken => _currentToken;
+
   /// Store JWT token
   Future<void> setToken(String token) async {
+    _currentToken = token;
     await _secureStorage.write(key: _tokenKey, value: token);
   }
 
@@ -195,6 +200,16 @@ class ApiService {
     Options? options,
   }) async {
     return _dio.put<T>(path, data: data, queryParameters: queryParameters, options: options);
+  }
+
+  /// PATCH request
+  Future<Response<T>> patch<T>(
+    String path, {
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+  }) async {
+    return _dio.patch<T>(path, data: data, queryParameters: queryParameters, options: options);
   }
 
   /// DELETE request

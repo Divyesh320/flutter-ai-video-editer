@@ -1,11 +1,17 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_tts/flutter_tts.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 import '../../../core/models/models.dart';
 import '../providers/chat_notifier.dart';
 import '../providers/chat_state.dart';
-import '../widgets/message_bubble.dart';
+import '../providers/conversation_notifier.dart';
+import '../widgets/animated_text_bubble.dart';
 import '../widgets/chat_input.dart';
+import '../widgets/message_bubble.dart';
+import '../widgets/typing_indicator.dart';
 
 /// Main chat screen with message list and input
 class ChatScreen extends ConsumerStatefulWidget {
@@ -22,63 +28,222 @@ class ChatScreen extends ConsumerStatefulWidget {
 
 class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _scrollController = ScrollController();
+  String? _currentConversationId;
+  String _conversationTitle = 'New Chat';
+  
+  // Speech-to-Text
+  final stt.SpeechToText _speech = stt.SpeechToText();
+  bool _isListening = false;
+  bool _speechAvailable = false;
+  
+  // Text-to-Speech
+  final FlutterTts _tts = FlutterTts();
+  bool _isSpeaking = false;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadConversation();
+    _currentConversationId = widget.conversationId;
+    
+    // Initialize speech & TTS
+    _initSpeech();
+    _initTts();
+    
+    // Delay to avoid modifying provider during build
+    Future.microtask(() {
+      if (mounted) _loadConversation();
     });
   }
-
-  void _loadConversation() {
-    if (widget.conversationId != null) {
-      ref.read(chatNotifierProvider.notifier).loadConversation(
-            widget.conversationId!,
-          );
+  
+  Future<void> _initSpeech() async {
+    try {
+      _speechAvailable = await _speech.initialize(
+        onStatus: (status) {
+          if (status == 'done' || status == 'notListening') {
+            if (mounted) setState(() => _isListening = false);
+          }
+        },
+        onError: (error) {
+          if (mounted) setState(() => _isListening = false);
+        },
+      );
+    } catch (e) {
+      // Speech not available on this device/simulator
+      _speechAvailable = false;
+      debugPrint('Speech-to-text not available: $e');
+    }
+    if (mounted) setState(() {});
+  }
+  
+  Future<void> _initTts() async {
+    try {
+      await _tts.setLanguage('en-US');
+      await _tts.setSpeechRate(0.5);
+      await _tts.setVolume(1.0);
+      
+      _tts.setCompletionHandler(() {
+        if (mounted) setState(() => _isSpeaking = false);
+      });
+    } catch (e) {
+      // TTS not available on this device/simulator
+      debugPrint('Text-to-speech not available: $e');
+    }
+  }
+  
+  void _toggleListening() async {
+    if (_isListening) {
+      await _speech.stop();
+      setState(() => _isListening = false);
     } else {
-      ref.read(chatNotifierProvider.notifier).startNewConversation();
+      if (_speechAvailable) {
+        setState(() => _isListening = true);
+        await _speech.listen(
+          onResult: (result) {
+            if (result.finalResult && result.recognizedWords.isNotEmpty) {
+              _handleSendMessage(result.recognizedWords);
+              setState(() => _isListening = false);
+            }
+          },
+          listenFor: const Duration(seconds: 30),
+          pauseFor: const Duration(seconds: 3),
+          localeId: 'en_US', // Will auto-detect language
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Speech recognition not available')),
+        );
+      }
+    }
+  }
+  
+  Future<void> _speakText(String text) async {
+    if (_isSpeaking) {
+      await _tts.stop();
+      setState(() => _isSpeaking = false);
+    } else {
+      setState(() => _isSpeaking = true);
+      await _tts.speak(text);
     }
   }
 
-  void _scrollToBottom() {
-    if (_scrollController.hasClients) {
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
+  @override
+  void didUpdateWidget(ChatScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.conversationId != oldWidget.conversationId) {
+      _currentConversationId = widget.conversationId;
+      // Delay to avoid modifying provider during build
+      Future.microtask(() {
+        if (mounted) _loadConversation();
+      });
+    }
+  }
+
+  void _loadConversation() {
+    if (_currentConversationId != null) {
+      ref.read(chatNotifierProvider.notifier).loadConversation(
+            _currentConversationId!,
+          );
+      // Load conversation details for title
+      _loadConversationTitle();
+    } else {
+      ref.read(chatNotifierProvider.notifier).startNewConversation();
+      setState(() => _conversationTitle = 'New Chat');
+    }
+  }
+
+  Future<void> _loadConversationTitle() async {
+    final conversations = ref.read(conversationNotifierProvider).conversations;
+    final conv = conversations.where((c) => c.id == _currentConversationId).firstOrNull;
+    if (conv != null) {
+      setState(() => _conversationTitle = conv.title ?? 'New Chat');
     }
   }
 
   @override
   void dispose() {
     _scrollController.dispose();
+    _speech.stop();
+    _tts.stop();
     super.dispose();
   }
-
 
   @override
   Widget build(BuildContext context) {
     final chatState = ref.watch(chatNotifierProvider);
 
-    // Scroll to bottom when new messages arrive
+    // Update conversation ID when created
     ref.listen<ChatState>(chatNotifierProvider, (previous, next) {
-      if (previous?.messages.length != next.messages.length) {
-        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+      if (next.conversationId != null && _currentConversationId == null) {
+        _currentConversationId = next.conversationId;
       }
     });
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Chat'),
+        title: GestureDetector(
+          onTap: _showRenameDialog,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  _conversationTitle,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 4),
+              const Icon(Icons.edit, size: 16),
+            ],
+          ),
+        ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () {
-              ref.read(chatNotifierProvider.notifier).startNewConversation();
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            onSelected: (value) {
+              switch (value) {
+                case 'new':
+                  _startNewChat();
+                  break;
+                case 'rename':
+                  _showRenameDialog();
+                  break;
+                case 'delete':
+                  _showDeleteDialog();
+                  break;
+              }
             },
-            tooltip: 'New conversation',
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'new',
+                child: Row(
+                  children: [
+                    Icon(Icons.add),
+                    SizedBox(width: 8),
+                    Text('New Chat'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'rename',
+                child: Row(
+                  children: [
+                    Icon(Icons.edit),
+                    SizedBox(width: 8),
+                    Text('Rename'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'delete',
+                child: Row(
+                  children: [
+                    Icon(Icons.delete, color: Colors.red),
+                    SizedBox(width: 8),
+                    Text('Delete', style: TextStyle(color: Colors.red)),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -91,8 +256,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             _buildErrorBanner(chatState.errorMessage!),
           ChatInput(
             onSend: _handleSendMessage,
+            onSendWithAttachment: _handleSendWithAttachment,
             isLoading: chatState.isSending,
             enabled: chatState.isReady,
+            suggestions: chatState.suggestions,
+            onSuggestionTap: (suggestion) {
+              ref.read(chatNotifierProvider.notifier).clearSuggestions();
+              _handleSendMessage(suggestion);
+            },
+            onVoiceInput: _speechAvailable ? _toggleListening : null,
+            isListening: _isListening,
           ),
         ],
       ),
@@ -143,18 +316,65 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       );
     }
 
+    // Calculate item count: messages + typing indicator if sending
+    final itemCount = state.messages.length + (state.isSending ? 1 : 0);
+
+    // Use reverse: true for bottom-to-top chat like ChatGPT
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.all(16),
-      itemCount: state.messages.length,
+      reverse: true, // Bottom to top
+      itemCount: itemCount,
       itemBuilder: (context, index) {
-        final message = state.messages[index];
+        // Reverse index for correct order
+        final reversedIndex = itemCount - 1 - index;
+        
+        // Show typing indicator at the end (which is index 0 in reversed list)
+        if (state.isSending && reversedIndex == state.messages.length) {
+          return const TypingIndicator();
+        }
+
+        final message = state.messages[reversedIndex];
+        final isUser = message.role == MessageRole.user;
+        
+        // Check if this is the last assistant message (for animation)
+        final isLastAssistantMessage = !isUser && 
+            reversedIndex == state.messages.length - 1 &&
+            !state.isSending;
+
+        // Use animated bubble for the latest AI response
+        if (!isUser && isLastAssistantMessage) {
+          return AnimatedTextBubble(
+            key: ValueKey('animated_${message.id}'),
+            message: message,
+            animateText: _shouldAnimateMessage(message.id),
+            onAnimationComplete: () {
+              _markMessageAnimated(message.id);
+            },
+            onSpeak: () => _speakText(message.content),
+            isSpeaking: _isSpeaking,
+          );
+        }
+
         return MessageBubble(
           message: message,
-          isUser: message.role == MessageRole.user,
+          isUser: isUser,
+          onSpeak: isUser ? null : () => _speakText(message.content),
+          isSpeaking: _isSpeaking,
         );
       },
     );
+  }
+
+  // Track which messages have been animated
+  final Set<String> _animatedMessageIds = {};
+
+  bool _shouldAnimateMessage(String messageId) {
+    return !_animatedMessageIds.contains(messageId);
+  }
+
+  void _markMessageAnimated(String messageId) {
+    _animatedMessageIds.add(messageId);
   }
 
   Widget _buildErrorBanner(String message) {
@@ -186,5 +406,101 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   void _handleSendMessage(String content) {
     if (content.trim().isEmpty) return;
     ref.read(chatNotifierProvider.notifier).sendMessage(content);
+  }
+  
+  void _handleSendWithAttachment(String message, File? image, File? video) {
+    if (image != null) {
+      // Send message with image
+      ref.read(chatNotifierProvider.notifier).sendMessageWithImage(
+        message.isEmpty ? 'Analyze this image' : message,
+        image,
+      );
+    } else if (video != null) {
+      // Send message with video
+      ref.read(chatNotifierProvider.notifier).sendMessageWithVideo(
+        message.isEmpty ? 'Analyze this video' : message,
+        video,
+      );
+    } else if (message.isNotEmpty) {
+      ref.read(chatNotifierProvider.notifier).sendMessage(message);
+    }
+  }
+
+  void _startNewChat() {
+    ref.read(chatNotifierProvider.notifier).startNewConversation();
+    setState(() {
+      _currentConversationId = null;
+      _conversationTitle = 'New Chat';
+    });
+    _animatedMessageIds.clear();
+  }
+
+  void _showRenameDialog() {
+    if (_currentConversationId == null) return;
+    
+    final controller = TextEditingController(text: _conversationTitle);
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Rename Chat'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            labelText: 'Chat Name',
+            border: OutlineInputBorder(),
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final newTitle = controller.text.trim();
+              if (newTitle.isNotEmpty && _currentConversationId != null) {
+                await ref.read(conversationNotifierProvider.notifier)
+                    .renameConversation(_currentConversationId!, newTitle);
+                setState(() => _conversationTitle = newTitle);
+              }
+              if (mounted) Navigator.pop(context);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteDialog() {
+    if (_currentConversationId == null) return;
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Chat'),
+        content: const Text('Are you sure you want to delete this chat? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              if (_currentConversationId != null) {
+                await ref.read(conversationNotifierProvider.notifier)
+                    .deleteConversation(_currentConversationId!);
+                _startNewChat();
+              }
+              if (mounted) Navigator.pop(context);
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
   }
 }

@@ -1,3 +1,6 @@
+import 'dart:developer' as developer;
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -5,6 +8,17 @@ import '../providers/auth_notifier.dart';
 import '../providers/auth_state.dart';
 import '../services/auth_service.dart';
 import '../utils/validators.dart';
+
+/// Simple logger for signup screen
+void _log(String message) {
+  final timestamp = DateTime.now().toIso8601String();
+  final logMessage = '[$timestamp] [SignupScreen] $message';
+  if (kDebugMode) {
+    developer.log(logMessage, name: 'SignupScreen');
+    // ignore: avoid_print
+    print(logMessage);
+  }
+}
 
 /// Signup screen for new user registration
 class SignupScreen extends ConsumerStatefulWidget {
@@ -24,7 +38,14 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   bool _obscureConfirmPassword = true;
 
   @override
+  void initState() {
+    super.initState();
+    _log('🚀 SignupScreen initialized');
+  }
+
+  @override
   void dispose() {
+    _log('🔚 SignupScreen disposed');
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
@@ -38,15 +59,22 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
 
     // Listen for auth state changes
     ref.listen<AuthState>(authNotifierProvider, (previous, next) {
+      _log('📊 Auth state changed: ${previous?.status} -> ${next.status}');
+      
       if (next.isAuthenticated) {
+        _log('✅ Signup successful! User: ${next.user?.email}');
+        _log('🏠 Navigating to home screen');
         Navigator.of(context).popUntil((route) => route.isFirst);
       } else if (next.hasError && next.errorMessage != null) {
+        _log('❌ Signup error: ${next.errorMessage}');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(next.errorMessage!),
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
+      } else if (next.isLoading) {
+        _log('⏳ Signup in progress...');
       }
     });
 
@@ -203,18 +231,32 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   }
 
   void _handleSignup() {
-    if (_formKey.currentState?.validate() ?? false) {
+    _log('🔘 Signup button pressed');
+    
+    final isValid = _formKey.currentState?.validate() ?? false;
+    _log('📝 Form validation: ${isValid ? "PASSED" : "FAILED"}');
+    
+    if (isValid) {
+      final email = _emailController.text.trim();
+      final name = _nameController.text.trim();
+      
+      _log('👤 Name: ${name.isNotEmpty ? name : "(not provided)"}');
+      _log('📧 Email: $email');
+      _log('🔑 Password: ***HIDDEN*** (length: ${_passwordController.text.length})');
+      _log('📤 Calling signup API...');
+      
       ref.read(authNotifierProvider.notifier).signup(
-            email: _emailController.text.trim(),
+            email: email,
             password: _passwordController.text,
-            name: _nameController.text.trim().isNotEmpty
-                ? _nameController.text.trim()
-                : null,
+            name: name.isNotEmpty ? name : null,
           );
+    } else {
+      _log('⚠️ Form validation failed, not submitting');
     }
   }
 
   void _handleOAuthLogin(OAuthProvider provider) {
+    _log('🔘 OAuth signup pressed: $provider');
     ref.read(authNotifierProvider.notifier).loginWithOAuth(provider);
   }
 }

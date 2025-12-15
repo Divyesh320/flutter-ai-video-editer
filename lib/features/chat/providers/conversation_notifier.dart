@@ -19,14 +19,14 @@ class ConversationNotifier extends StateNotifier<ConversationListState> {
 
   final ChatService _chatService;
 
-  /// Load all conversations for the current user
+  /// Load all conversations for the current user from backend
   Future<void> loadConversations() async {
     state = const ConversationListState.loading();
 
     try {
       final conversations = await _chatService.getConversations();
-
-      // Sort by most recent activity (updatedAt descending)
+      
+      // Sort by most recent
       final sorted = List<Conversation>.from(conversations)
         ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
 
@@ -35,11 +35,15 @@ class ConversationNotifier extends StateNotifier<ConversationListState> {
         selectedConversationId: state.selectedConversationId,
       );
     } catch (e) {
-      state = ConversationListState.error(_getErrorMessage(e));
+      // If backend fails, use empty list
+      state = ConversationListState.loaded(
+        conversations: const [],
+        selectedConversationId: null,
+      );
     }
   }
 
-  /// Create a new conversation
+  /// Create a new conversation via backend
   Future<Conversation?> createConversation() async {
     try {
       final conversation = await _chatService.createConversation();
@@ -53,8 +57,23 @@ class ConversationNotifier extends StateNotifier<ConversationListState> {
 
       return conversation;
     } catch (e) {
-      state = state.copyWith(errorMessage: _getErrorMessage(e));
-      return null;
+      // Fallback to local conversation
+      final conversation = Conversation(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        userId: 'local-user',
+        title: 'New Chat',
+        messages: const [],
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      final updated = [conversation, ...state.conversations];
+      state = state.copyWith(
+        conversations: updated,
+        selectedConversationId: conversation.id,
+      );
+
+      return conversation;
     }
   }
 
@@ -62,6 +81,23 @@ class ConversationNotifier extends StateNotifier<ConversationListState> {
   /// Select a conversation
   void selectConversation(String conversationId) {
     state = state.copyWith(selectedConversationId: conversationId);
+  }
+
+  /// Rename a conversation
+  Future<void> renameConversation(String conversationId, String newTitle) async {
+    try {
+      await _chatService.renameConversation(conversationId, newTitle);
+
+      // Update in list
+      final index = state.conversations.indexWhere((c) => c.id == conversationId);
+      if (index != -1) {
+        final updated = List<Conversation>.from(state.conversations);
+        updated[index] = updated[index].copyWith(title: newTitle);
+        state = state.copyWith(conversations: updated);
+      }
+    } catch (e) {
+      state = state.copyWith(errorMessage: _getErrorMessage(e));
+    }
   }
 
   /// Delete a conversation and all associated data

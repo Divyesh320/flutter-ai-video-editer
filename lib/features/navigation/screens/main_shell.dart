@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../chat/screens/chat_screen.dart';
 import '../../settings/screens/settings_screen.dart';
-import '../widgets/radial_fab_menu.dart';
 import 'home_screen.dart';
 
 /// Provider for current navigation index
@@ -57,7 +56,7 @@ class MainShell extends ConsumerWidget {
           ),
         ],
       ),
-      floatingActionButton: const RadialFabMenu(),
+      // floatingActionButton: const RadialFabMenu(),
     );
   }
 

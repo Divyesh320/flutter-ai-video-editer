@@ -25,6 +25,7 @@ class ChatState extends Equatable {
     this.conversationId,
     this.errorMessage,
     this.isSending = false,
+    this.suggestions = const [],
   });
 
   /// Current chat status
@@ -42,13 +43,17 @@ class ChatState extends Equatable {
   /// Whether a message is being sent
   final bool isSending;
 
+  /// AI-powered follow-up suggestions
+  final List<String> suggestions;
+
   /// Initial state
   const ChatState.initial()
       : status = ChatStatus.initial,
         messages = const [],
         conversationId = null,
         errorMessage = null,
-        isSending = false;
+        isSending = false,
+        suggestions = const [];
 
   /// Loading state
   const ChatState.loading()
@@ -56,14 +61,16 @@ class ChatState extends Equatable {
         messages = const [],
         conversationId = null,
         errorMessage = null,
-        isSending = false;
+        isSending = false,
+        suggestions = const [];
 
 
   /// Loaded state with messages
   ChatState.loaded({
-    required List<Message> this.messages,
+    required this.messages,
     required String this.conversationId,
     this.isSending = false,
+    this.suggestions = const [],
   })  : status = ChatStatus.loaded,
         errorMessage = null;
 
@@ -72,7 +79,8 @@ class ChatState extends Equatable {
       : status = ChatStatus.error,
         messages = const [],
         conversationId = null,
-        isSending = false;
+        isSending = false,
+        suggestions = const [];
 
   /// Whether chat is loading
   bool get isLoading => status == ChatStatus.loading;
@@ -90,6 +98,7 @@ class ChatState extends Equatable {
     String? conversationId,
     String? errorMessage,
     bool? isSending,
+    List<String>? suggestions,
   }) {
     return ChatState(
       status: status ?? this.status,
@@ -97,10 +106,11 @@ class ChatState extends Equatable {
       conversationId: conversationId ?? this.conversationId,
       errorMessage: errorMessage ?? this.errorMessage,
       isSending: isSending ?? this.isSending,
+      suggestions: suggestions ?? this.suggestions,
     );
   }
 
   @override
   List<Object?> get props =>
-      [status, messages, conversationId, errorMessage, isSending];
+      [status, messages, conversationId, errorMessage, isSending, suggestions];
 }

@@ -1,10 +1,68 @@
 import 'dart:convert';
+import 'dart:developer' as developer;
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../../../core/config/config.dart';
 import '../../../core/models/models.dart';
+
+/// Logger for auth operations
+class AuthLogger {
+  static void log(String message, {String? name, Object? error}) {
+    final timestamp = DateTime.now().toIso8601String();
+    final logMessage = '[$timestamp] [AUTH] $message';
+    
+    if (kDebugMode) {
+      developer.log(logMessage, name: name ?? 'AuthService', error: error);
+      // ignore: avoid_print
+      print(logMessage);
+      if (error != null) {
+        // ignore: avoid_print
+        print('Error: $error');
+      }
+    }
+  }
+  
+  static void request(String method, String endpoint, {Map<String, dynamic>? data}) {
+    log('📤 REQUEST: $method $endpoint');
+    if (data != null && kDebugMode) {
+      // Mask sensitive data
+      final maskedData = Map<String, dynamic>.from(data);
+      if (maskedData.containsKey('password')) {
+        maskedData['password'] = '***HIDDEN***';
+      }
+      log('   Data: $maskedData');
+    }
+  }
+  
+  static void response(int? statusCode, String endpoint, {dynamic data}) {
+    log('📥 RESPONSE: $statusCode $endpoint');
+    if (data != null && kDebugMode) {
+      log('   Success: ${data['success']}');
+      if (data['message'] != null) {
+        log('   Message: ${data['message']}');
+      }
+    }
+  }
+  
+  static void error(String message, {Object? error, StackTrace? stackTrace}) {
+    log('❌ ERROR: $message', error: error);
+    if (stackTrace != null && kDebugMode) {
+      // ignore: avoid_print
+      print('StackTrace: $stackTrace');
+    }
+  }
+  
+  static void success(String message) {
+    log('✅ SUCCESS: $message');
+  }
+  
+  static void info(String message) {
+    log('ℹ️ INFO: $message');
+  }
+}
 
 /// Authentication response from backend
 class AuthResponse {
@@ -116,36 +174,60 @@ class AuthServiceImpl implements AuthService {
   static const _userKey = 'user_data';
 
   void _setupDio() {
+    final baseUrl = EnvConfig.instance.apiBaseUrl;
+    final timeout = EnvConfig.instance.apiTimeoutSeconds;
+    
+    AuthLogger.info('Setting up Dio with baseUrl: $baseUrl, timeout: ${timeout}s');
+    
     _dio.options = BaseOptions(
-      baseUrl: EnvConfig.instance.apiBaseUrl,
-      connectTimeout: Duration(seconds: EnvConfig.instance.apiTimeoutSeconds),
-      receiveTimeout: Duration(seconds: EnvConfig.instance.apiTimeoutSeconds),
+      baseUrl: baseUrl,
+      connectTimeout: Duration(seconds: timeout),
+      receiveTimeout: Duration(seconds: timeout),
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
     );
 
-    // Add auth interceptor
+    // Add logging interceptor
     _dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) async {
+        AuthLogger.request(options.method, options.path, data: options.data is Map ? options.data : null);
+        
         final token = await _secureStorage.read(key: _accessTokenKey);
         if (token != null) {
           options.headers['Authorization'] = 'Bearer $token';
+          AuthLogger.info('Added auth token to request');
         }
         handler.next(options);
       },
+      onResponse: (response, handler) {
+        AuthLogger.response(response.statusCode, response.requestOptions.path, data: response.data);
+        handler.next(response);
+      },
       onError: (error, handler) async {
+        AuthLogger.error(
+          'Request failed: ${error.requestOptions.path}',
+          error: '${error.type}: ${error.message}',
+        );
+        
+        if (error.response != null) {
+          AuthLogger.error('Response status: ${error.response?.statusCode}');
+          AuthLogger.error('Response data: ${error.response?.data}');
+        }
+        
         // Auto refresh token on 401
         if (error.response?.statusCode == 401) {
+          AuthLogger.info('Got 401, attempting token refresh...');
           try {
             final newToken = await refreshToken();
+            AuthLogger.success('Token refreshed, retrying request');
             error.requestOptions.headers['Authorization'] = 'Bearer $newToken';
             final response = await _dio.fetch(error.requestOptions);
             handler.resolve(response);
             return;
           } catch (e) {
-            // Refresh failed, clear credentials
+            AuthLogger.error('Token refresh failed', error: e);
             await _clearCredentials();
           }
         }
@@ -156,41 +238,78 @@ class AuthServiceImpl implements AuthService {
 
   @override
   Future<AuthResponse> login(LoginRequest request) async {
+    AuthLogger.info('=== LOGIN STARTED ===');
+    AuthLogger.info('Email: ${request.email}');
+    
     try {
+      AuthLogger.info('Sending login request to /auth/login');
       final response = await _dio.post(
         '/auth/login',
         data: request.toJson(),
       );
 
+      AuthLogger.info('Login response received');
+      
       if (response.data['success'] == true) {
+        AuthLogger.success('Login successful!');
         final authResponse = AuthResponse.fromJson(response.data['data']);
+        AuthLogger.info('User: ${authResponse.user.email}');
+        AuthLogger.info('Token received: ${authResponse.accessToken.substring(0, 20)}...');
+        
         await _storeCredentials(authResponse);
+        AuthLogger.success('Credentials stored securely');
+        AuthLogger.info('=== LOGIN COMPLETED ===');
         return authResponse;
       }
 
-      throw AuthException(response.data['message'] ?? 'Login failed');
+      final errorMsg = response.data['message'] ?? 'Login failed';
+      AuthLogger.error('Login failed: $errorMsg');
+      throw AuthException(errorMsg);
     } on DioException catch (e) {
+      AuthLogger.error('Login DioException', error: e.message);
       throw _handleDioError(e);
+    } catch (e) {
+      AuthLogger.error('Login unexpected error', error: e);
+      rethrow;
     }
   }
 
   @override
   Future<AuthResponse> signup(SignupRequest request) async {
+    AuthLogger.info('=== SIGNUP STARTED ===');
+    AuthLogger.info('Email: ${request.email}');
+    AuthLogger.info('Name: ${request.name ?? "not provided"}');
+    
     try {
+      AuthLogger.info('Sending signup request to /auth/register');
       final response = await _dio.post(
         '/auth/register',
         data: request.toJson(),
       );
 
+      AuthLogger.info('Signup response received');
+      
       if (response.data['success'] == true) {
+        AuthLogger.success('Signup successful!');
         final authResponse = AuthResponse.fromJson(response.data['data']);
+        AuthLogger.info('User created: ${authResponse.user.email}');
+        AuthLogger.info('Token received: ${authResponse.accessToken.substring(0, 20)}...');
+        
         await _storeCredentials(authResponse);
+        AuthLogger.success('Credentials stored securely');
+        AuthLogger.info('=== SIGNUP COMPLETED ===');
         return authResponse;
       }
 
-      throw AuthException(response.data['message'] ?? 'Registration failed');
+      final errorMsg = response.data['message'] ?? 'Registration failed';
+      AuthLogger.error('Signup failed: $errorMsg');
+      throw AuthException(errorMsg);
     } on DioException catch (e) {
+      AuthLogger.error('Signup DioException', error: e.message);
       throw _handleDioError(e);
+    } catch (e) {
+      AuthLogger.error('Signup unexpected error', error: e);
+      rethrow;
     }
   }
 

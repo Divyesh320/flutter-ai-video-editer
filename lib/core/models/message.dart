@@ -1,32 +1,21 @@
 import 'package:equatable/equatable.dart';
-import 'package:json_annotation/json_annotation.dart';
-
-part 'message.g.dart';
 
 /// Role of the message sender
 enum MessageRole {
-  @JsonValue('user')
   user,
-  @JsonValue('assistant')
   assistant,
-  @JsonValue('system')
   system,
 }
 
 /// Type of message content
 enum MessageType {
-  @JsonValue('text')
   text,
-  @JsonValue('image')
   image,
-  @JsonValue('video')
   video,
-  @JsonValue('audio')
   audio,
 }
 
 /// Message model representing a single message in a conversation
-@JsonSerializable()
 class Message extends Equatable {
   const Message({
     required this.id,
@@ -43,7 +32,6 @@ class Message extends Equatable {
   final String id;
 
   /// ID of the conversation this message belongs to
-  @JsonKey(name: 'conversation_id')
   final String conversationId;
 
   /// Role of the message sender (user, assistant, system)
@@ -62,15 +50,77 @@ class Message extends Equatable {
   final List<MediaReference>? media;
 
   /// Message creation timestamp
-  @JsonKey(name: 'created_at')
   final DateTime createdAt;
 
-  /// Creates a Message from JSON map
-  factory Message.fromJson(Map<String, dynamic> json) =>
-      _$MessageFromJson(json);
+  /// Creates a Message from JSON map - matches backend format
+  factory Message.fromJson(Map<String, dynamic> json) {
+    return Message(
+      id: json['_id'] as String? ?? json['id'] as String? ?? '',
+      conversationId: json['conversationId'] as String? ?? 
+                      json['conversation_id'] as String? ?? '',
+      role: _parseRole(json['role']),
+      content: json['content'] as String? ?? '',
+      type: _parseType(json['type']),
+      metadata: json['metadata'] as Map<String, dynamic>?,
+      media: _parseMedia(json['media']),
+      createdAt: _parseDateTime(json['createdAt'] ?? json['created_at']),
+    );
+  }
+
+  static MessageRole _parseRole(dynamic value) {
+    if (value == null) return MessageRole.user;
+    final str = value.toString().toLowerCase();
+    switch (str) {
+      case 'assistant':
+        return MessageRole.assistant;
+      case 'system':
+        return MessageRole.system;
+      default:
+        return MessageRole.user;
+    }
+  }
+
+  static MessageType _parseType(dynamic value) {
+    if (value == null) return MessageType.text;
+    final str = value.toString().toLowerCase();
+    switch (str) {
+      case 'image':
+        return MessageType.image;
+      case 'video':
+        return MessageType.video;
+      case 'audio':
+        return MessageType.audio;
+      default:
+        return MessageType.text;
+    }
+  }
+
+  static DateTime _parseDateTime(dynamic value) {
+    if (value == null) return DateTime.now();
+    if (value is DateTime) return value;
+    if (value is String) return DateTime.tryParse(value) ?? DateTime.now();
+    return DateTime.now();
+  }
+
+  static List<MediaReference>? _parseMedia(dynamic value) {
+    if (value == null) return null;
+    if (value is! List) return null;
+    return value
+        .map((e) => MediaReference.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
 
   /// Converts Message to JSON map
-  Map<String, dynamic> toJson() => _$MessageToJson(this);
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'conversationId': conversationId,
+    'role': role.name,
+    'content': content,
+    'type': type.name,
+    if (metadata != null) 'metadata': metadata,
+    if (media != null) 'media': media!.map((e) => e.toJson()).toList(),
+    'createdAt': createdAt.toIso8601String(),
+  };
 
   /// Creates a copy of Message with optional field overrides
   Message copyWith({
@@ -101,7 +151,6 @@ class Message extends Equatable {
 }
 
 /// Reference to a media asset
-@JsonSerializable()
 class MediaReference extends Equatable {
   const MediaReference({
     required this.id,
@@ -127,11 +176,37 @@ class MediaReference extends Equatable {
   final String? transcript;
 
   /// Creates a MediaReference from JSON map
-  factory MediaReference.fromJson(Map<String, dynamic> json) =>
-      _$MediaReferenceFromJson(json);
+  factory MediaReference.fromJson(Map<String, dynamic> json) {
+    return MediaReference(
+      id: json['_id'] as String? ?? json['id'] as String? ?? '',
+      url: json['url'] as String? ?? '',
+      type: _parseMediaType(json['type']),
+      analysis: json['analysis'] as Map<String, dynamic>?,
+      transcript: json['transcript'] as String?,
+    );
+  }
+
+  static MediaType _parseMediaType(dynamic value) {
+    if (value == null) return MediaType.image;
+    final str = value.toString().toLowerCase();
+    switch (str) {
+      case 'video':
+        return MediaType.video;
+      case 'audio':
+        return MediaType.audio;
+      default:
+        return MediaType.image;
+    }
+  }
 
   /// Converts MediaReference to JSON map
-  Map<String, dynamic> toJson() => _$MediaReferenceToJson(this);
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'url': url,
+    'type': type.name,
+    if (analysis != null) 'analysis': analysis,
+    if (transcript != null) 'transcript': transcript,
+  };
 
   @override
   List<Object?> get props => [id, url, type, analysis, transcript];
@@ -139,10 +214,7 @@ class MediaReference extends Equatable {
 
 /// Type of media asset
 enum MediaType {
-  @JsonValue('image')
   image,
-  @JsonValue('video')
   video,
-  @JsonValue('audio')
   audio,
 }

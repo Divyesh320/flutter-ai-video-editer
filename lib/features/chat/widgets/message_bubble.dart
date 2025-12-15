@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 
 import '../../../core/models/models.dart';
@@ -9,10 +11,14 @@ class MessageBubble extends StatelessWidget {
     super.key,
     required this.message,
     required this.isUser,
+    this.onSpeak,
+    this.isSpeaking = false,
   });
 
   final Message message;
   final bool isUser;
+  final VoidCallback? onSpeak;
+  final bool isSpeaking;
 
   @override
   Widget build(BuildContext context) {
@@ -44,12 +50,89 @@ class MessageBubble extends StatelessWidget {
                   bottomRight: Radius.circular(isUser ? 4 : 16),
                 ),
               ),
-              child: _buildContent(theme),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildContent(theme),
+                  const SizedBox(height: 4),
+                  // Action buttons row
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Copy button
+                      GestureDetector(
+                        onTap: () => _copyToClipboard(context),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.copy,
+                              size: 14,
+                              color: isUser
+                                  ? theme.colorScheme.onPrimary.withValues(alpha: 0.7)
+                                  : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Copy',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isUser
+                                    ? theme.colorScheme.onPrimary.withValues(alpha: 0.7)
+                                    : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Speaker button (TTS) - only for AI messages
+                      if (!isUser && onSpeak != null) ...[
+                        const SizedBox(width: 16),
+                        GestureDetector(
+                          onTap: onSpeak,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                isSpeaking ? Icons.stop : Icons.volume_up,
+                                size: 14,
+                                color: isSpeaking 
+                                    ? Colors.blue
+                                    : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                isSpeaking ? 'Stop' : 'Speak',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isSpeaking 
+                                      ? Colors.blue
+                                      : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
           const SizedBox(width: 8),
           if (isUser) _buildAvatar(theme),
         ],
+      ),
+    );
+  }
+
+  void _copyToClipboard(BuildContext context) {
+    Clipboard.setData(ClipboardData(text: message.content));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Copied to clipboard'),
+        duration: Duration(seconds: 1),
       ),
     );
   }
@@ -72,6 +155,82 @@ class MessageBubble extends StatelessWidget {
     final textColor = isUser
         ? theme.colorScheme.onPrimary
         : theme.colorScheme.onSurfaceVariant;
+
+    // Handle image messages
+    if (message.type == MessageType.image && isUser) {
+      final imagePath = message.metadata?['imagePath'] as String?;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (imagePath != null)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.file(
+                File(imagePath),
+                width: 200,
+                height: 200,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  width: 200,
+                  height: 100,
+                  color: Colors.grey.shade300,
+                  child: const Icon(Icons.broken_image, size: 40),
+                ),
+              ),
+            ),
+          if (imagePath != null) const SizedBox(height: 8),
+          SelectableText(
+            message.content,
+            style: TextStyle(color: textColor),
+          ),
+        ],
+      );
+    }
+
+    // Handle video messages
+    if (message.type == MessageType.video && isUser) {
+      final videoPath = message.metadata?['videoPath'] as String?;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 200,
+            height: 120,
+            decoration: BoxDecoration(
+              color: Colors.black87,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                const Icon(Icons.videocam, color: Colors.white54, size: 40),
+                Positioned(
+                  bottom: 8,
+                  left: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      videoPath?.split('/').last ?? 'Video',
+                      style: const TextStyle(color: Colors.white, fontSize: 10),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          SelectableText(
+            message.content,
+            style: TextStyle(color: textColor),
+          ),
+        ],
+      );
+    }
 
     // Use markdown rendering for assistant messages
     if (!isUser && message.type == MessageType.text) {
@@ -99,7 +258,8 @@ class MessageBubble extends StatelessWidget {
       );
     }
 
-    return Text(
+    // User messages - also selectable
+    return SelectableText(
       message.content,
       style: TextStyle(color: textColor),
     );

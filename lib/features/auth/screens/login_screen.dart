@@ -1,3 +1,6 @@
+import 'dart:developer' as developer;
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -5,6 +8,17 @@ import '../providers/auth_notifier.dart';
 import '../providers/auth_state.dart';
 import '../services/auth_service.dart';
 import '../utils/validators.dart';
+
+/// Simple logger for login screen
+void _log(String message) {
+  final timestamp = DateTime.now().toIso8601String();
+  final logMessage = '[$timestamp] [LoginScreen] $message';
+  if (kDebugMode) {
+    developer.log(logMessage, name: 'LoginScreen');
+    // ignore: avoid_print
+    print(logMessage);
+  }
+}
 
 /// Login screen for email authentication
 class LoginScreen extends ConsumerStatefulWidget {
@@ -21,7 +35,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _obscurePassword = true;
 
   @override
+  void initState() {
+    super.initState();
+    _log('🚀 LoginScreen initialized');
+  }
+
+  @override
   void dispose() {
+    _log('🔚 LoginScreen disposed');
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -33,17 +54,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     // Listen for auth state changes
     ref.listen<AuthState>(authNotifierProvider, (previous, next) {
+      _log('📊 Auth state changed: ${previous?.status} -> ${next.status}');
+      
       if (next.isAuthenticated) {
-        // Navigate to home on successful login
+        _log('✅ Login successful! User: ${next.user?.email}');
+        _log('🏠 Navigating to home screen');
         Navigator.of(context).popUntil((route) => route.isFirst);
       } else if (next.hasError && next.errorMessage != null) {
-        // Show error snackbar
+        _log('❌ Login error: ${next.errorMessage}');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(next.errorMessage!),
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
+      } else if (next.isLoading) {
+        _log('⏳ Login in progress...');
       }
     });
 
@@ -157,15 +183,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   void _handleLogin() {
-    if (_formKey.currentState?.validate() ?? false) {
+    _log('🔘 Login button pressed');
+    
+    final isValid = _formKey.currentState?.validate() ?? false;
+    _log('📝 Form validation: ${isValid ? "PASSED" : "FAILED"}');
+    
+    if (isValid) {
+      final email = _emailController.text.trim();
+      _log('📧 Email: $email');
+      _log('🔑 Password: ***HIDDEN*** (length: ${_passwordController.text.length})');
+      _log('📤 Calling login API...');
+      
       ref.read(authNotifierProvider.notifier).login(
-            email: _emailController.text.trim(),
+            email: email,
             password: _passwordController.text,
           );
+    } else {
+      _log('⚠️ Form validation failed, not submitting');
     }
   }
 
   void _handleOAuthLogin(OAuthProvider provider) {
+    _log('🔘 OAuth login pressed: $provider');
     ref.read(authNotifierProvider.notifier).loginWithOAuth(provider);
   }
 }

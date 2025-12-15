@@ -1,7 +1,21 @@
+import 'dart:developer' as developer;
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/auth_service.dart';
 import 'auth_state.dart';
+
+/// Logger for auth notifier
+void _log(String message) {
+  final timestamp = DateTime.now().toIso8601String();
+  final logMessage = '[$timestamp] [AuthNotifier] $message';
+  if (kDebugMode) {
+    developer.log(logMessage, name: 'AuthNotifier');
+    // ignore: avoid_print
+    print(logMessage);
+  }
+}
 
 /// Provider for AuthService
 final authServiceProvider = Provider<AuthService>((ref) {
@@ -54,19 +68,28 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required String email,
     required String password,
   }) async {
+    _log('🔐 Login called for: $email');
     state = const AuthState.loading();
+    _log('📊 State: loading');
 
     try {
+      _log('📤 Calling authService.login()...');
       final response = await _authService.login(
         LoginRequest(email: email, password: password),
       );
 
+      _log('✅ Login successful! User: ${response.user.email}');
       state = AuthState.authenticated(
         user: response.user,
         token: response.accessToken,
       );
+      _log('📊 State: authenticated');
     } catch (e) {
-      state = AuthState.error(_getErrorMessage(e));
+      final errorMsg = _getErrorMessage(e);
+      _log('❌ Login failed: $errorMsg');
+      _log('❌ Original error: $e');
+      state = AuthState.error(errorMsg);
+      _log('📊 State: error');
     }
   }
 
@@ -76,19 +99,28 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required String password,
     String? name,
   }) async {
+    _log('📝 Signup called for: $email, name: ${name ?? "not provided"}');
     state = const AuthState.loading();
+    _log('📊 State: loading');
 
     try {
+      _log('📤 Calling authService.signup()...');
       final response = await _authService.signup(
         SignupRequest(email: email, password: password, name: name),
       );
 
+      _log('✅ Signup successful! User: ${response.user.email}');
       state = AuthState.authenticated(
         user: response.user,
         token: response.accessToken,
       );
+      _log('📊 State: authenticated');
     } catch (e) {
-      state = AuthState.error(_getErrorMessage(e));
+      final errorMsg = _getErrorMessage(e);
+      _log('❌ Signup failed: $errorMsg');
+      _log('❌ Original error: $e');
+      state = AuthState.error(errorMsg);
+      _log('📊 State: error');
     }
   }
 
